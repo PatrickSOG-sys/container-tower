@@ -379,7 +379,6 @@ function ImportModal({ onImport, onClose }) {
 export default function App() {
   const [containers, setContainers] = useState([]);
   const [settings, setSettings] = useState({ alertEmail: "", teamName: "Container Control Tower" });
-  const [view, setView] = useState("dashboard");
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("All");
   const [filterAccount, setFilterAccount] = useState("All");
