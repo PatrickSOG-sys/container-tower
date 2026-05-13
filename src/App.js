@@ -462,40 +462,37 @@ export default function App() {
     const missing = getMissing(container);
     const risks = getRisks(container);
     try {
-      const response = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          service_id: "container_tower",
-          template_id: "template_axte7b4",
-          user_id: "Qlzhfww6xwroSYEfw",
-          template_params: {
-            to_email: settings.alertEmail,
-            container_number: container.containerNumber,
-            eta: container.eta || "TBD",
-            port: container.port || "TBD",
-            destination: container.destination || "Not confirmed",
-            trucker: container.truckerWarehouse || container.truckerDistributor || "NOT ASSIGNED",
-            customs_status: container.customsStatus,
-            doc_status: container.docStatus,
-            pickup_status: container.pickupStatus,
-            missing: missing.length > 0 ? missing.join(", ") : "None",
-            risks: risks.length > 0 ? risks.join(", ") : "None",
-            name: "Container Control Tower",
-            email: settings.alertEmail,
-          }
-        })
-      });
-      if (response.ok || response.status === 200) {
-        await api(`/containers?container_number=eq.${container.containerNumber}`, "PATCH", { alert_sent:true, updated_at:new Date().toISOString() });
-        setContainers(prev => prev.map(c => c.containerNumber===container.containerNumber ? {...c,alertSent:true} : c));
-        showToast(`Alert sent for ${container.containerNumber}`);
-        setEmailTarget(null);
-      } else {
-        const err = await response.text();
-        showToast(`Email failed: ${err}`, "danger");
+      // Load EmailJS SDK dynamically
+      if (!window.emailjs) {
+        await new Promise((resolve, reject) => {
+          const script = document.createElement("script");
+          script.src = "https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js";
+          script.onload = resolve;
+          script.onerror = reject;
+          document.head.appendChild(script);
+        });
+        window.emailjs.init("Qlzhfww6xwroSYEfw");
       }
-    } catch(e) { showToast(`Email failed: ${e.message}`, "danger"); }
+      await window.emailjs.send("container_tower", "template_axte7b4", {
+        to_email: settings.alertEmail,
+        container_number: container.containerNumber,
+        eta: container.eta || "TBD",
+        port: container.port || "TBD",
+        destination: container.destination || "Not confirmed",
+        trucker: container.truckerWarehouse || container.truckerDistributor || "NOT ASSIGNED",
+        customs_status: container.customsStatus,
+        doc_status: container.docStatus,
+        pickup_status: container.pickupStatus,
+        missing: missing.length > 0 ? missing.join(", ") : "None",
+        risks: risks.length > 0 ? risks.join(", ") : "None",
+        name: "Container Control Tower",
+        email: settings.alertEmail,
+      });
+      await api(`/containers?container_number=eq.${container.containerNumber}`, "PATCH", { alert_sent:true, updated_at:new Date().toISOString() });
+      setContainers(prev => prev.map(c => c.containerNumber===container.containerNumber ? {...c,alertSent:true} : c));
+      showToast(`Alert sent for ${container.containerNumber}`);
+      setEmailTarget(null);
+    } catch(e) { showToast(`Email failed: ${e.message || JSON.stringify(e)}`, "danger"); }
     setEmailSending(false);
   };
 
