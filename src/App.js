@@ -282,7 +282,7 @@ function EmailPreview({ container, recipientEmail, onClose, onSend, isSending })
           style={{ padding:"8px 18px",borderRadius:6,border:"1px solid #ddd",background:"#fff",cursor:"pointer",fontSize:13,color:"#555",fontFamily:"inherit" }}>
           Cancel
         </button>
-        <button onClick={() => onSend(subject, body)} disabled={isSending}
+        <button onClick={() => onSend()} disabled={isSending}
           style={{ padding:"8px 18px",borderRadius:6,border:"none",background:"#2563eb",color:"#fff",fontWeight:700,cursor:isSending?"not-allowed":"pointer",fontSize:13,opacity:isSending?0.6:1,fontFamily:"inherit" }}>
           {isSending ? "Sending…" : "Send via Gmail"}
         </button>
@@ -457,27 +457,45 @@ export default function App() {
     setSaving(false);
   };
 
-  const sendEmail = async (container, subject, body) => {
+  const sendEmail = async (container) => {
     setEmailSending(true);
+    const missing = getMissing(container);
+    const risks = getRisks(container);
     try {
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({
-          model:"claude-sonnet-4-20250514", max_tokens:1000,
-          messages:[{role:"user",content:`Send an email via Gmail:\nTo: ${settings.alertEmail}\nSubject: ${subject}\nBody: ${body}`}],
-          mcp_servers:[{type:"url",url:"https://gmailmcp.googleapis.com/mcp/v1",name:"gmail-mcp"}]
+      const response = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          service_id: "container_tower",
+          template_id: "template_axte7b4",
+          user_id: "Qlzhfww6xwroSYEfw",
+          template_params: {
+            to_email: settings.alertEmail,
+            container_number: container.containerNumber,
+            eta: container.eta || "TBD",
+            port: container.port || "TBD",
+            destination: container.destination || "Not confirmed",
+            trucker: container.truckerWarehouse || container.truckerDistributor || "NOT ASSIGNED",
+            customs_status: container.customsStatus,
+            doc_status: container.docStatus,
+            pickup_status: container.pickupStatus,
+            missing: missing.length > 0 ? missing.join(", ") : "None",
+            risks: risks.length > 0 ? risks.join(", ") : "None",
+            name: "Container Control Tower",
+            email: settings.alertEmail,
+          }
         })
       });
-      const data = await response.json();
-      const txt = (data.content||[]).map(b=>b.text||"").join(" ");
-      if (txt.toLowerCase().includes("sent") || txt.toLowerCase().includes("success") || (data.content||[]).some(b=>b.type==="mcp_tool_result")) {
+      if (response.ok || response.status === 200) {
         await api(`/containers?container_number=eq.${container.containerNumber}`, "PATCH", { alert_sent:true, updated_at:new Date().toISOString() });
         setContainers(prev => prev.map(c => c.containerNumber===container.containerNumber ? {...c,alertSent:true} : c));
         showToast(`Alert sent for ${container.containerNumber}`);
         setEmailTarget(null);
-      } else { showToast("Email may not have sent — check Gmail connection.", "warning"); }
-    } catch(e) { showToast("Email failed.", "danger"); }
+      } else {
+        const err = await response.text();
+        showToast(`Email failed: ${err}`, "danger");
+      }
+    } catch(e) { showToast(`Email failed: ${e.message}`, "danger"); }
     setEmailSending(false);
   };
 
