@@ -424,7 +424,7 @@ export default function App() {
   };
 
   const deleteContainer = (num) => {
-    if (!confirm(`Delete ${num}?`)) return;
+    if (!window.confirm(`Delete ${num}?`)) return;
     persist(containers.filter(c => c.containerNumber !== num));
     showToast(`${num} deleted.`, "danger");
   };
