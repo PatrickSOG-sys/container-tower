@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 
 const SUPABASE_URL = "https://lltddaygonppsyvrpdsm.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxsdGRkYXlnb25wcHN5dnJwZHNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2MjA5ODEsImV4cCI6MjA5NDE5Njk4MX0.1L9tV2UYanFXD4_M3gSqRd40a0rtXObxjeL77md3RtA";
@@ -98,10 +98,10 @@ function getRisks(c) {
 
 const lightInp = {
   width:"100%", boxSizing:"border-box", padding:"9px 12px",
-  border:"1px solid #ddd", borderRadius:6,
-  background:"#f9f9f9", color:"#111", fontSize:13,
+  border:"1px solid #e0e0e0", borderRadius:6,
+  background:"#ffffff", color:"#111111", fontSize:13,
   fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
-  outline:"none"
+  outline:"none", WebkitAppearance:"none"
 };
 
 const darkInp = {
@@ -141,15 +141,47 @@ function FieldLabel({ children }) {
   );
 }
 
-// ─── CONTAINER FORM ───────────────────────────────────────────────
+// ─── CONTAINER FORM (uncontrolled refs — prevents focus loss) ────
 function ContainerForm({ initial, onSave, onClose, isSaving }) {
-  const [form, setForm] = useState({ ...EMPTY, ...initial });
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const refs = {
+    containerNumber: React.useRef(), account: React.useRef(),
+    carrier: React.useRef(), eta: React.useRef(),
+    port: React.useRef(), destination: React.useRef(),
+    distributor: React.useRef(), status: React.useRef(),
+    truckerWarehouse: React.useRef(), truckerDistributor: React.useRef(),
+    customsStatus: React.useRef(), docStatus: React.useRef(),
+    pickupStatus: React.useRef(), deliveryStatus: React.useRef(),
+    requiredDocs: React.useRef(), notes: React.useRef(),
+  };
 
   const handleSave = () => {
-    if (!form.containerNumber.trim()) { alert("Container number is required."); return; }
-    onSave({ ...form, containerNumber: form.containerNumber.trim().toUpperCase() });
+    const val = (k) => refs[k].current ? refs[k].current.value : "";
+    const containerNumber = val("containerNumber").trim().toUpperCase();
+    if (!containerNumber) { alert("Container number is required."); return; }
+    onSave({
+      ...EMPTY,
+      ...initial,
+      containerNumber,
+      account: val("account"),
+      carrier: val("carrier"),
+      eta: val("eta"),
+      port: val("port"),
+      destination: val("destination"),
+      distributor: val("distributor"),
+      status: val("status"),
+      truckerWarehouse: val("truckerWarehouse"),
+      truckerDistributor: val("truckerDistributor"),
+      customsStatus: val("customsStatus"),
+      docStatus: val("docStatus"),
+      pickupStatus: val("pickupStatus"),
+      deliveryStatus: val("deliveryStatus"),
+      requiredDocs: val("requiredDocs"),
+      notes: val("notes"),
+      alertSent: initial.alertSent || false,
+    });
   };
+
+  const ini = { ...EMPTY, ...initial };
 
   const F = ({ label, children }) => (
     <div style={{ marginBottom:14 }}>
@@ -158,91 +190,43 @@ function ContainerForm({ initial, onSave, onClose, isSaving }) {
     </div>
   );
 
+  const Inp = ({ name, placeholder, type="text" }) => (
+    <input ref={refs[name]} type={type} style={lightInp}
+      defaultValue={ini[name]||""} placeholder={placeholder||""}
+      onBlur={name==="containerNumber" ? e => { e.target.value = e.target.value.toUpperCase(); } : undefined} />
+  );
+
+  const Sel = ({ name, options }) => (
+    <select ref={refs[name]} style={lightInp} defaultValue={ini[name]||options[0]}>
+      {options.map(o => <option key={o} value={o}>{o}</option>)}
+    </select>
+  );
+
   return (
     <div>
       <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"0 16px" }}>
-        <F label="Container Number *">
-          <input style={lightInp} value={form.containerNumber}
-            onChange={e => set("containerNumber", e.target.value.toUpperCase())}
-            placeholder="e.g. TCNU8484777" />
-        </F>
-        <F label="Account / Client">
-          <input style={lightInp} value={form.account}
-            onChange={e => set("account", e.target.value)}
-            placeholder="e.g. CAVA, TFK" />
-        </F>
-        <F label="Shipping Line / Carrier">
-          <input style={lightInp} value={form.carrier}
-            onChange={e => set("carrier", e.target.value)}
-            placeholder="e.g. Maersk, MSC" />
-        </F>
-        <F label="ETA to Port">
-          <input type="date" style={lightInp} value={form.eta}
-            onChange={e => set("eta", e.target.value)} />
-        </F>
-        <F label="Port of Arrival">
-          <input style={lightInp} value={form.port}
-            onChange={e => set("port", e.target.value)}
-            placeholder="e.g. Long Beach, Charleston" />
-        </F>
-        <F label="Final Destination">
-          <input style={lightInp} value={form.destination}
-            onChange={e => set("destination", e.target.value)} />
-        </F>
-        <F label="Distributor (if applicable)">
-          <input style={lightInp} value={form.distributor}
-            onChange={e => set("distributor", e.target.value)} />
-        </F>
-        <F label="Status">
-          <select style={lightInp} value={form.status} onChange={e => set("status", e.target.value)}>
-            {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-        </F>
-        <F label="Trucker — Port to Warehouse">
-          <input style={lightInp} value={form.truckerWarehouse}
-            onChange={e => set("truckerWarehouse", e.target.value)} />
-        </F>
-        <F label="Trucker — Port to Distributor">
-          <input style={lightInp} value={form.truckerDistributor}
-            onChange={e => set("truckerDistributor", e.target.value)} />
-        </F>
-        <F label="Customs Status">
-          <select style={lightInp} value={form.customsStatus} onChange={e => set("customsStatus", e.target.value)}>
-            {["Pending","In Progress","Cleared","Hold"].map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-        </F>
-        <F label="Document Status">
-          <select style={lightInp} value={form.docStatus} onChange={e => set("docStatus", e.target.value)}>
-            {["Incomplete","In Progress","Complete"].map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-        </F>
-        <F label="Pickup Status">
-          <select style={lightInp} value={form.pickupStatus} onChange={e => set("pickupStatus", e.target.value)}>
-            {["Not Scheduled","Scheduled","Completed"].map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-        </F>
-        <F label="Delivery Status">
-          <select style={lightInp} value={form.deliveryStatus} onChange={e => set("deliveryStatus", e.target.value)}>
-            {["Pending","In Transit","Delivered"].map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-        </F>
+        <F label="Container Number *"><Inp name="containerNumber" placeholder="e.g. TCNU8484777"/></F>
+        <F label="Account / Client"><Inp name="account" placeholder="e.g. CAVA, TFK"/></F>
+        <F label="Shipping Line / Carrier"><Inp name="carrier" placeholder="e.g. Maersk, MSC"/></F>
+        <F label="ETA to Port"><Inp name="eta" type="date"/></F>
+        <F label="Port of Arrival"><Inp name="port" placeholder="e.g. Long Beach, Charleston"/></F>
+        <F label="Final Destination"><Inp name="destination" placeholder="Warehouse or distributor address"/></F>
+        <F label="Distributor (if applicable)"><Inp name="distributor"/></F>
+        <F label="Status"><Sel name="status" options={STATUSES}/></F>
+        <F label="Trucker — Port to Warehouse"><Inp name="truckerWarehouse"/></F>
+        <F label="Trucker — Port to Distributor"><Inp name="truckerDistributor"/></F>
+        <F label="Customs Status"><Sel name="customsStatus" options={["Pending","In Progress","Cleared","Hold"]}/></F>
+        <F label="Document Status"><Sel name="docStatus" options={["Incomplete","In Progress","Complete"]}/></F>
+        <F label="Pickup Status"><Sel name="pickupStatus" options={["Not Scheduled","Scheduled","Completed"]}/></F>
+        <F label="Delivery Status"><Sel name="deliveryStatus" options={["Pending","In Transit","Delivered"]}/></F>
       </div>
-      <F label="Required Documents">
-        <input style={lightInp} value={form.requiredDocs}
-          onChange={e => set("requiredDocs", e.target.value)}
-          placeholder="e.g. BL, Commercial Invoice, Packing List" />
-      </F>
+      <F label="Required Documents"><Inp name="requiredDocs" placeholder="e.g. BL, Commercial Invoice, Packing List"/></F>
       <F label="Notes / Risks / Next Actions">
-        <textarea style={{ ...lightInp, minHeight:80, resize:"vertical" }}
-          value={form.notes} onChange={e => set("notes", e.target.value)} />
+        <textarea ref={refs.notes} style={{ ...lightInp, minHeight:80, resize:"vertical" }} defaultValue={ini.notes||""}/>
       </F>
       <div style={{ display:"flex",gap:10,justifyContent:"flex-end",borderTop:"1px solid #eee",paddingTop:16,marginTop:8 }}>
-        <button onClick={onClose}
-          style={{ padding:"8px 18px",borderRadius:6,border:"1px solid #ddd",background:"#fff",cursor:"pointer",fontSize:13,color:"#555",fontFamily:"inherit" }}>
-          Cancel
-        </button>
-        <button onClick={handleSave} disabled={isSaving}
-          style={{ padding:"8px 20px",borderRadius:6,border:"none",background:"#111",color:"#fff",fontWeight:700,cursor:isSaving?"not-allowed":"pointer",fontSize:13,opacity:isSaving?0.6:1,fontFamily:"inherit" }}>
+        <button onClick={onClose} style={{ padding:"8px 18px",borderRadius:6,border:"1px solid #ddd",background:"#fff",cursor:"pointer",fontSize:13,color:"#555",fontFamily:"inherit" }}>Cancel</button>
+        <button onClick={handleSave} disabled={isSaving} style={{ padding:"8px 20px",borderRadius:6,border:"none",background:"#111",color:"#fff",fontWeight:700,cursor:isSaving?"not-allowed":"pointer",fontSize:13,opacity:isSaving?0.6:1,fontFamily:"inherit" }}>
           {isSaving ? "Saving…" : "Save Container"}
         </button>
       </div>
@@ -406,24 +390,28 @@ export default function App() {
     finally { setLoading(false); }
   }, []);
 
+  const anyModalOpen = showAdd || editContainer || emailTarget || showSettings || showImport;
+
   useEffect(() => {
     loadContainers();
+    if (anyModalOpen) return;
     const iv = setInterval(loadContainers, 30000);
     return () => clearInterval(iv);
-  }, [loadContainers]);
+  }, [loadContainers, anyModalOpen]);
 
   useEffect(() => {
     try { const r = localStorage.getItem(SETTINGS_KEY); if(r) setSettings(JSON.parse(r)); } catch{}
   }, []);
 
-  const persistSettings = (s) => {
+  const persistSettings = useCallback((s) => {
     setSettings(s);
     try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); } catch{}
     setShowSettings(false);
     showToast("Settings saved.");
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const saveContainer = async (c) => {
+  const saveContainer = useCallback(async (c) => {
     setSaving(true);
     try {
       const existing = containers.find(x => x.containerNumber === c.containerNumber);
@@ -440,16 +428,18 @@ export default function App() {
       setEditContainer(null);
     } catch(e) { showToast(`Save failed: ${e.message}`, "danger"); }
     setSaving(false);
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [containers]);
 
-  const deleteContainer = async (num) => {
+  const deleteContainer = useCallback(async (num) => {
     if (!window.confirm(`Delete ${num}? This cannot be undone.`)) return;
     try {
       await api(`/containers?container_number=eq.${num}`, "DELETE");
       setContainers(prev => prev.filter(c => c.containerNumber !== num));
       showToast(`${num} deleted.`, "danger");
     } catch(e) { showToast(`Delete failed: ${e.message}`, "danger"); }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [containers]);
 
   const importContainers = async (newOnes) => {
     setSaving(true);
@@ -542,7 +532,9 @@ export default function App() {
         ::-webkit-scrollbar-track{background:#111}
         ::-webkit-scrollbar-thumb{background:#333;border-radius:2px}
         tbody tr:hover td{background:rgba(255,255,255,0.025)!important}
-        input:focus,select:focus,textarea:focus{outline:none;border-color:#555!important;background:#fff!important}
+        input,select,textarea{-webkit-appearance:none;appearance:none}
+        input:focus,select:focus,textarea:focus{outline:none!important;border-color:#999!important;box-shadow:none!important}
+        input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus{-webkit-box-shadow:0 0 0px 1000px #ffffff inset!important;-webkit-text-fill-color:#111111!important}
       `}</style>
 
       {/* HEADER */}
@@ -733,8 +725,8 @@ export default function App() {
       </div>
 
       {/* MODALS */}
-      {showAdd && <Modal title="Add Container" onClose={()=>setShowAdd(false)}><ContainerForm initial={{}} onSave={saveContainer} onClose={()=>setShowAdd(false)} isSaving={saving}/></Modal>}
-      {editContainer && <Modal title={`Edit — ${editContainer.containerNumber}`} onClose={()=>setEditContainer(null)}><ContainerForm initial={editContainer} onSave={saveContainer} onClose={()=>setEditContainer(null)} isSaving={saving}/></Modal>}
+      {showAdd && <Modal key="add-modal" title="Add Container" onClose={()=>setShowAdd(false)}><ContainerForm initial={EMPTY} onSave={saveContainer} onClose={()=>setShowAdd(false)} isSaving={saving}/></Modal>}
+      {editContainer && <Modal key="edit-modal" title={`Edit — ${editContainer.containerNumber}`} onClose={()=>setEditContainer(null)}><ContainerForm initial={editContainer} onSave={saveContainer} onClose={()=>setEditContainer(null)} isSaving={saving}/></Modal>}
       {emailTarget && <Modal title={`Alert Email — ${emailTarget.containerNumber}`} onClose={()=>setEmailTarget(null)}><EmailPreview container={emailTarget} recipientEmail={settings.alertEmail} onClose={()=>setEmailTarget(null)} onSend={(s,b)=>sendEmail(emailTarget,s,b)} isSending={emailSending}/></Modal>}
       {showSettings && <Modal title="Settings" onClose={()=>setShowSettings(false)}><SettingsModal settings={settings} onSave={persistSettings} onClose={()=>setShowSettings(false)}/></Modal>}
       {showImport && <Modal title="Import Containers" onClose={()=>setShowImport(false)}><ImportModal onImport={importContainers} onClose={()=>setShowImport(false)}/></Modal>}
